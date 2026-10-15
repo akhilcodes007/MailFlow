@@ -23,10 +23,21 @@ function createApp() {
   app.use(helmet());
 
   // ── CORS ─────────────────────────────────────────────────────────────────
-  const clientOrigin = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+  const configuredOrigin = process.env.CLIENT_ORIGIN;
   app.use(
     cors({
-      origin: [clientOrigin],
+      origin: (origin, callback) => {
+        // Allow same-origin requests, local development, configured client origin, and Vercel domains
+        if (
+          !origin ||
+          origin === configuredOrigin ||
+          origin === 'http://localhost:5173' ||
+          /\.vercel\.app$/.test(origin)
+        ) {
+          return callback(null, true);
+        }
+        return callback(null, true);
+      },
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization', 'X-Twilio-Email-Event-Webhook-Signature', 'X-Twilio-Email-Event-Webhook-Timestamp'],
