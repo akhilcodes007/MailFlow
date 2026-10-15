@@ -21,11 +21,12 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle 401 globally — clear invalid/expired token and redirect to login
+// Handle 401 globally — clear invalid/expired token and redirect to login (except on public auth routes)
+const publicAuthPaths = ['/login', '/signup', '/verify-email', '/forgot-password', '/reset-password'];
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err.response?.status === 401 && window.location.pathname !== '/login') {
+    if (err.response?.status === 401 && !publicAuthPaths.includes(window.location.pathname)) {
       localStorage.removeItem('mf_token');
       window.location.href = '/login';
     }

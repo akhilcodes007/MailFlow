@@ -318,6 +318,114 @@ async function processCampaignSending(campaignId) {
   return campaign;
 }
 
+/**
+ * Send an email verification link to a newly registered user.
+ */
+async function sendVerificationEmail({ to, name, verificationUrl }) {
+  const configuredFromEmail = (process.env.SENDGRID_FROM_EMAIL || '').trim();
+  const fromName = process.env.SENDGRID_FROM_NAME || 'MailFlow';
+
+  if (!isSendGridConfigured() || process.env.NODE_ENV === 'test') {
+    return {
+      success: true,
+      mode: 'dry-run',
+      messageId: `dryrun-verify-${Date.now()}`,
+    };
+  }
+
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f172a; color: #f8fafc; padding: 40px 20px;">
+      <div style="max-width: 520px; margin: 0 auto; background-color: #1e293b; border-radius: 12px; padding: 32px; border: 1px solid #334155;">
+        <h2 style="color: #38bdf8; margin-top: 0;">Welcome to MailFlow</h2>
+        <p style="color: #cbd5e1; font-size: 15px; line-height: 1.6;">Hello ${name || 'there'},</p>
+        <p style="color: #cbd5e1; font-size: 15px; line-height: 1.6;">Thank you for registering. Please click the button below to verify your email address and activate your account:</p>
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${verificationUrl}" style="background-color: #0284c7; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px; display: inline-block;">Verify Email Address</a>
+        </div>
+        <p style="color: #94a3b8; font-size: 13px; line-height: 1.5;">This link will expire in 24 hours. If you did not create an account with MailFlow, please ignore this email.</p>
+        <hr style="border: 0; border-top: 1px solid #334155; margin: 24px 0;" />
+        <p style="color: #64748b; font-size: 12px; word-break: break-all;">Link not working? Copy and paste this URL into your browser:<br /><a href="${verificationUrl}" style="color: #38bdf8;">${verificationUrl}</a></p>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const text = `Welcome to MailFlow!\n\nPlease verify your email by clicking the link:\n${verificationUrl}\n\nThis link will expire in 24 hours.`;
+
+  try {
+    const [response] = await sgMail.send({
+      to,
+      from: { email: configuredFromEmail, name: fromName },
+      subject: 'Verify your email address — MailFlow',
+      html,
+      text,
+    });
+    return { success: true, mode: 'live', messageId: response.headers['x-message-id'] };
+  } catch (err) {
+    console.error('[EMAIL ERROR] Failed to send verification email:', err.message);
+    return { success: false, mode: 'live', error: err.message };
+  }
+}
+
+/**
+ * Send a password reset link to a user.
+ */
+async function sendPasswordResetEmail({ to, name, resetUrl }) {
+  const configuredFromEmail = (process.env.SENDGRID_FROM_EMAIL || '').trim();
+  const fromName = process.env.SENDGRID_FROM_NAME || 'MailFlow';
+
+  if (!isSendGridConfigured() || process.env.NODE_ENV === 'test') {
+    return {
+      success: true,
+      mode: 'dry-run',
+      messageId: `dryrun-reset-${Date.now()}`,
+    };
+  }
+
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f172a; color: #f8fafc; padding: 40px 20px;">
+      <div style="max-width: 520px; margin: 0 auto; background-color: #1e293b; border-radius: 12px; padding: 32px; border: 1px solid #334155;">
+        <h2 style="color: #38bdf8; margin-top: 0;">Password Reset Request</h2>
+        <p style="color: #cbd5e1; font-size: 15px; line-height: 1.6;">Hello ${name || 'there'},</p>
+        <p style="color: #cbd5e1; font-size: 15px; line-height: 1.6;">We received a request to reset the password for your MailFlow account. Click the button below to choose a new password:</p>
+        <div style="text-align: center; margin: 32px 0;">
+          <a href="${resetUrl}" style="background-color: #e11d48; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 8px; font-weight: 600; font-size: 14px; display: inline-block;">Reset Password</a>
+        </div>
+        <p style="color: #94a3b8; font-size: 13px; line-height: 1.5;">This link will expire in 1 hour. If you did not request a password reset, you can safely ignore this email — your account remains secure.</p>
+        <hr style="border: 0; border-top: 1px solid #334155; margin: 24px 0;" />
+        <p style="color: #64748b; font-size: 12px; word-break: break-all;">Link not working? Copy and paste this URL into your browser:<br /><a href="${resetUrl}" style="color: #38bdf8;">${resetUrl}</a></p>
+      </div>
+    </body>
+    </html>
+  `;
+
+  const text = `MailFlow Password Reset\n\nClick the following link to reset your password:\n${resetUrl}\n\nThis link will expire in 1 hour. If you did not request this, please ignore.`;
+
+  try {
+    const [response] = await sgMail.send({
+      to,
+      from: { email: configuredFromEmail, name: fromName },
+      subject: 'Reset your MailFlow password',
+      html,
+      text,
+    });
+    return { success: true, mode: 'live', messageId: response.headers['x-message-id'] };
+  } catch (err) {
+    console.error('[EMAIL ERROR] Failed to send password reset email:', err.message);
+    return { success: false, mode: 'live', error: err.message };
+  }
+}
+
 module.exports = {
   isSendGridConfigured,
   shouldDryRun,
@@ -325,4 +433,7 @@ module.exports = {
   interpolateContent,
   sendSingleRecipientEmail,
   processCampaignSending,
+  sendVerificationEmail,
+  sendPasswordResetEmail,
 };
+

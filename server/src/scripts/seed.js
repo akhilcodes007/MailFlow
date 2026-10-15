@@ -36,7 +36,14 @@ async function seed() {
     return;
   }
 
-  const user = new User({ email, password, role: 'admin' });
+  const user = new User({
+    name: 'Admin',
+    email,
+    password,
+    role: 'admin',
+    isEmailVerified: true,
+    tokenVersion: 0,
+  });
   await user.save();
   console.log(`[SEED] ✅ Admin created: ${email}`);
   await mongoose.disconnect();

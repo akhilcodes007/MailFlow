@@ -14,12 +14,15 @@ const app = createApp();
 
 const testUser = {
   _id: '507f1f77bcf86cd799439011',
+  name: 'Admin',
   email: 'admin@example.com',
   role: 'admin',
+  isEmailVerified: true,
+  tokenVersion: 0,
 };
 
 const authToken = jwt.sign(
-  { id: testUser._id, email: testUser.email, role: testUser.role },
+  { id: testUser._id, email: testUser.email, role: testUser.role, tokenVersion: 0 },
   process.env.JWT_SECRET || 'test_jwt_secret_must_be_at_least_32_characters_long'
 );
 

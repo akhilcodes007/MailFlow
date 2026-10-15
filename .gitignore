@@ -36,3 +36,8 @@ desktop.ini
 # --- Coverage / test ---
 coverage/
 .nyc_output/
+
+# --- Backups (never commit DB snapshots) ---
+backups/
+server/backups/
+
