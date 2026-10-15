@@ -13,6 +13,7 @@ const rateLimit = require('express-rate-limit');
 const healthRouter = require('./routes/health');
 const authRouter = require('./routes/auth');
 const campaignsRouter = require('./routes/campaigns');
+const webhooksRouter = require('./routes/webhooks');
 const errorHandler = require('./middleware/errorHandler');
 
 function createApp() {
@@ -28,13 +29,20 @@ function createApp() {
       origin: [clientOrigin],
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Twilio-Email-Event-Webhook-Signature', 'X-Twilio-Email-Event-Webhook-Timestamp'],
     })
   );
 
-  // ── Body parsing ─────────────────────────────────────────────────────────
-  app.use(express.json({ limit: '2mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '2mb' }));
+  // ── Body parsing with rawBody capture for webhook signature verification ─
+  app.use(
+    express.json({
+      limit: '10mb',
+      verify: (req, res, buf) => {
+        req.rawBody = buf.toString('utf8');
+      },
+    })
+  );
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // ── Request logging ──────────────────────────────────────────────────────
   if (process.env.NODE_ENV !== 'test') {
@@ -54,10 +62,10 @@ function createApp() {
   // ── Stricter limiter for auth endpoints ──────────────────────────────────
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 10,
+    max: process.env.NODE_ENV === 'production' ? 10 : 100,
     standardHeaders: true,
     legacyHeaders: false,
-    message: { success: false, message: 'Too many login attempts.' },
+    message: { success: false, message: 'Too many login attempts, please try again later.' },
   });
   app.use('/api/auth', authLimiter);
 
@@ -65,6 +73,7 @@ function createApp() {
   app.use('/api/health', healthRouter);
   app.use('/api/auth', authRouter);
   app.use('/api/campaigns', campaignsRouter);
+  app.use('/api/webhooks', webhooksRouter);
 
   // ── 404 handler ──────────────────────────────────────────────────────────
   app.use((req, res) => {

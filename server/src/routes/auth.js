@@ -1,7 +1,8 @@
 /**
  * src/routes/auth.js
- * POST /api/auth/login  — returns JWT
- * GET  /api/auth/me     — returns current user profile (protected)
+ * POST /api/auth/login            — returns JWT
+ * GET  /api/auth/me               — returns current user profile (protected)
+ * POST /api/auth/change-password  — updates password for authenticated admin (protected)
  *
  * There is NO registration endpoint. Admins are created via npm run seed.
  */
@@ -30,14 +31,13 @@ router.post(
 
       const user = await User.findOne({ email }).select('+password +loginAttempts +lockUntil');
       if (!user) {
-        // Generic message — don't reveal whether email exists
         return res.status(401).json({ success: false, message: 'Invalid email or password' });
       }
 
       if (user.isLocked) {
         return res.status(423).json({
           success: false,
-          message: 'Account temporarily locked. Try again in 15 minutes.',
+          message: 'Account temporarily locked due to too many failed attempts. Try again in 15 minutes.',
         });
       }
 
@@ -76,5 +76,48 @@ router.get('/me', authenticate, async (req, res, next) => {
     next(err);
   }
 });
+
+// ── Change password (authenticated) ───────────────────────────────────────────
+router.post(
+  '/change-password',
+  authenticate,
+  [
+    body('currentPassword').notEmpty().withMessage('Current password required'),
+    body('newPassword')
+      .isLength({ min: 8 })
+      .withMessage('New password must be at least 8 characters')
+      .custom((val, { req }) => {
+        if (val === req.body.currentPassword) {
+          throw new Error('New password must differ from current password');
+        }
+        return true;
+      }),
+    validate,
+  ],
+  async (req, res, next) => {
+    try {
+      const user = await User.findById(req.user.id).select('+password');
+      if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+      }
+
+      const isValid = await user.comparePassword(req.body.currentPassword);
+      if (!isValid) {
+        return res.status(401).json({ success: false, message: 'Incorrect current password' });
+      }
+
+      // Pre-save hook hashes user.password with bcryptjs cost 12
+      user.password = req.body.newPassword;
+      await user.save();
+
+      res.json({
+        success: true,
+        message: 'Password updated successfully. Please use your new password on next login.',
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
 
 module.exports = router;

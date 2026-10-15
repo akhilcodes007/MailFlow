@@ -23,7 +23,7 @@ const recipientSchema = new mongoose.Schema(
       enum: ['pending', 'processing', 'accepted', 'delivered', 'bounced', 'failed', 'dry-run'],
       default: 'pending',
     },
-    providerMessageId: { type: String, index: true },
+    providerMessageId: { type: String },
     error: { type: String },
     retryCount: { type: Number, default: 0 },
     sentAt: { type: Date },

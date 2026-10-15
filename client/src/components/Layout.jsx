@@ -1,5 +1,5 @@
 /**
- * src/components/Layout.jsx
+ * client/src/components/Layout.jsx
  * Sidebar navigation + main content area.
  */
 import { NavLink, useNavigate } from 'react-router-dom';
@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Mail,
   History,
+  ShieldCheck,
   LogOut,
   Zap,
   ChevronRight,
@@ -16,8 +17,9 @@ import toast from 'react-hot-toast';
 
 const navItems = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/compose', icon: Mail, label: 'Compose' },
+  { to: '/compose', icon: Mail, label: 'Compose Campaign' },
   { to: '/history', icon: History, label: 'Email History' },
+  { to: '/settings', icon: ShieldCheck, label: 'Settings & Status' },
 ];
 
 export default function Layout({ children }) {
@@ -31,17 +33,17 @@ export default function Layout({ children }) {
   };
 
   return (
-    <div className="flex h-screen bg-slate-900 text-slate-100 overflow-hidden">
+    <div className="flex h-screen bg-slate-900 text-slate-100 overflow-hidden font-sans">
       {/* Sidebar */}
-      <aside className="w-64 flex-shrink-0 flex flex-col bg-slate-800 border-r border-slate-700">
+      <aside className="w-64 flex-shrink-0 flex flex-col bg-slate-800 border-r border-slate-700/80">
         {/* Logo */}
-        <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-700">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center shadow-lg">
+        <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-700/80">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 via-indigo-600 to-violet-600 flex items-center justify-center shadow-lg shadow-blue-900/30">
             <Zap className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h1 className="font-bold text-lg leading-none text-white">MailFlow</h1>
-            <p className="text-xs text-slate-400 mt-0.5">Bulk Email Platform</p>
+            <h1 className="font-extrabold text-lg leading-none text-white tracking-tight">MailFlow</h1>
+            <p className="text-[11px] text-slate-400 mt-1 uppercase tracking-wider font-semibold">Bulk Mail Platform</p>
           </div>
         </div>
 
@@ -52,44 +54,36 @@ export default function Layout({ children }) {
               key={to}
               to={to}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group ${
+                `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group ${
                   isActive
                     ? 'bg-blue-600 text-white shadow-md shadow-blue-900/40'
-                    : 'text-slate-400 hover:bg-slate-700 hover:text-slate-100'
+                    : 'text-slate-400 hover:bg-slate-700/60 hover:text-slate-100'
                 }`
               }
             >
-              <Icon className="w-4.5 h-4.5 flex-shrink-0" size={18} />
+              <Icon className="w-4 h-4 flex-shrink-0" />
               <span className="flex-1">{label}</span>
-              <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-50 transition-opacity" size={14} />
+              <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-50 transition-opacity" />
             </NavLink>
           ))}
         </nav>
 
-        {/* Phase badge */}
-        <div className="mx-3 mb-3">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-950/60 border border-amber-800/40">
-            <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-            <span className="text-xs text-amber-300 font-medium">DRY-RUN mode — Phase 1</span>
-          </div>
-        </div>
-
         {/* User + Logout */}
-        <div className="p-3 border-t border-slate-700">
-          <div className="flex items-center gap-3 px-3 py-2 rounded-lg bg-slate-700/50 mb-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-sm font-bold text-white flex-shrink-0">
+        <div className="p-3 border-t border-slate-700/80">
+          <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-900/60 border border-slate-700/50 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
               {user?.email?.[0]?.toUpperCase() ?? 'A'}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-medium text-slate-100 truncate">{user?.email ?? 'Admin'}</p>
-              <p className="text-xs text-slate-400 capitalize">{user?.role ?? 'admin'}</p>
+              <p className="text-xs font-semibold text-slate-100 truncate">{user?.email ?? 'admin@example.com'}</p>
+              <p className="text-[10px] text-slate-400 capitalize">{user?.role ?? 'admin'}</p>
             </div>
           </div>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-400 hover:bg-slate-700 hover:text-red-400 transition-all duration-150"
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:bg-slate-700/60 hover:text-rose-400 transition-colors"
           >
-            <LogOut size={16} />
+            <LogOut size={15} />
             Sign out
           </button>
         </div>

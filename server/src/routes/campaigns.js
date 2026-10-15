@@ -129,10 +129,20 @@ router.post(
       const adminEmail = req.user.email;
       const { subject, body: emailBody, fromName, fromEmail, mode = 'dry-run' } = req.body;
 
+      const configuredFromEmail = (process.env.SENDGRID_FROM_EMAIL || '').trim();
+      if (fromEmail && fromEmail.trim()) {
+        if (!configuredFromEmail || fromEmail.trim().toLowerCase() !== configuredFromEmail.toLowerCase()) {
+          return res.status(400).json({
+            success: false,
+            message: 'From address does not match the verified Sender Identity (SENDGRID_FROM_EMAIL)',
+          });
+        }
+      }
+
       const result = await sendSingleRecipientEmail({
         to: adminEmail,
         name: 'Admin',
-        fromEmail,
+        fromEmail: configuredFromEmail,
         fromName,
         subjectTemplate: `[TEST] ${subject}`,
         bodyTemplate: emailBody,
@@ -270,6 +280,16 @@ router.post(
   ],
   async (req, res, next) => {
     try {
+      const configuredFromEmail = (process.env.SENDGRID_FROM_EMAIL || '').trim();
+      if (req.body.fromEmail && req.body.fromEmail.trim()) {
+        if (!configuredFromEmail || req.body.fromEmail.trim().toLowerCase() !== configuredFromEmail.toLowerCase()) {
+          return res.status(400).json({
+            success: false,
+            message: 'From address does not match the verified Sender Identity (SENDGRID_FROM_EMAIL)',
+          });
+        }
+      }
+
       // Validate recipients server-side
       const { valid } = cleanAndValidateRecipients(req.body.recipients);
 
@@ -311,7 +331,7 @@ router.post(
         subject: req.body.subject,
         body: req.body.body,
         fromName: req.body.fromName || '',
-        fromEmail: req.body.fromEmail || '',
+        fromEmail: configuredFromEmail,
         recipients: recipientsToStore,
         mode,
         status: 'draft',
@@ -405,6 +425,18 @@ router.post(
         });
       }
 
+      const configuredFromEmail = (process.env.SENDGRID_FROM_EMAIL || '').trim();
+      if (campaign.fromEmail && campaign.fromEmail.trim()) {
+        if (!configuredFromEmail || campaign.fromEmail.trim().toLowerCase() !== configuredFromEmail.toLowerCase()) {
+          campaign.status = 'draft';
+          await campaign.save();
+          return res.status(400).json({
+            success: false,
+            message: 'Campaign From address does not match the verified Sender Identity (SENDGRID_FROM_EMAIL)',
+          });
+        }
+      }
+
       // Check mode override if explicitly requested
       if (req.body.mode) {
         campaign.mode = req.body.mode === 'live' && isSendGridConfigured() ? 'live' : 'dry-run';
@@ -443,6 +475,16 @@ router.post(
       const campaign = await Campaign.findOne({ _id: req.params.id, createdBy: req.user.id });
       if (!campaign) {
         return res.status(404).json({ success: false, message: 'Campaign not found' });
+      }
+
+      const configuredFromEmail = (process.env.SENDGRID_FROM_EMAIL || '').trim();
+      if (campaign.fromEmail && campaign.fromEmail.trim()) {
+        if (!configuredFromEmail || campaign.fromEmail.trim().toLowerCase() !== configuredFromEmail.toLowerCase()) {
+          return res.status(400).json({
+            success: false,
+            message: 'Campaign From address does not match the verified Sender Identity (SENDGRID_FROM_EMAIL)',
+          });
+        }
       }
 
       const failedRecipients = campaign.recipients.filter((r) => r.status === 'failed');

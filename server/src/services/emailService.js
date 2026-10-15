@@ -23,12 +23,19 @@ const BATCH_DELAY_MS = parseInt(process.env.SEND_BATCH_DELAY_MS, 10) || 100;
 const MAX_TRANSIENT_RETRIES = 2;
 
 function isSendGridConfigured() {
-  const key = process.env.SENDGRID_API_KEY;
-  return Boolean(key && key.length > 20 && !key.startsWith('SG.REPLACE'));
+  const key = (process.env.SENDGRID_API_KEY || '').trim();
+  const fromEmail = (process.env.SENDGRID_FROM_EMAIL || '').trim();
+  return Boolean(
+    key &&
+    key.length > 20 &&
+    !key.startsWith('SG.REPLACE') &&
+    fromEmail &&
+    fromEmail.length > 0
+  );
 }
 
 function shouldDryRun(mode) {
-  // If explicitly requested dry-run, or SendGrid key is missing/placeholder, run in dry-run
+  // If explicitly requested dry-run, or SendGrid credentials/sender identity are missing or placeholder, run in dry-run
   if (mode === 'dry-run') return true;
   if (!isSendGridConfigured()) return true;
   return false;
@@ -99,6 +106,20 @@ async function sendSingleRecipientEmail({
   campaignId,
   mode = 'dry-run',
 }) {
+  const configuredFromEmail = (process.env.SENDGRID_FROM_EMAIL || '').trim();
+
+  // If a campaign or caller explicitly supplies a different From address, reject with a clear error
+  if (fromEmail && fromEmail.trim()) {
+    if (!configuredFromEmail || fromEmail.trim().toLowerCase() !== configuredFromEmail.toLowerCase()) {
+      return {
+        success: false,
+        status: 'failed',
+        mode,
+        error: 'From address does not match the verified Sender Identity (SENDGRID_FROM_EMAIL)',
+      };
+    }
+  }
+
   const personalizedSubject = interpolateContent(subjectTemplate, { email: to, name });
   const rawBody = interpolateContent(bodyTemplate, { email: to, name });
   const sanitizedHtml = sanitizeEmailHtml(rawBody);
@@ -130,12 +151,21 @@ async function sendSingleRecipientEmail({
   }
 
   // 3. LIVE SendGrid execution
+  if (!configuredFromEmail) {
+    return {
+      success: false,
+      status: 'failed',
+      mode: 'live',
+      error: 'SENDGRID_FROM_EMAIL is not configured on the server',
+    };
+  }
+
   sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
   const msg = {
     to: name ? { email: to, name } : to,
     from: {
-      email: fromEmail || process.env.SENDGRID_FROM_EMAIL || 'noreply@example.com',
+      email: configuredFromEmail,
       name: fromName || process.env.SENDGRID_FROM_NAME || 'MailFlow',
     },
     subject: personalizedSubject,
@@ -208,7 +238,20 @@ async function processCampaignSending(campaignId) {
   const campaign = await Campaign.findById(campaignId);
   if (!campaign) throw new Error('Campaign not found');
 
-  const fromEmail = campaign.fromEmail || process.env.SENDGRID_FROM_EMAIL || 'noreply@example.com';
+  const configuredFromEmail = (process.env.SENDGRID_FROM_EMAIL || '').trim();
+
+  // If the campaign supplies a different From address, reject with a clear error rather than silently overriding
+  if (campaign.fromEmail && campaign.fromEmail.trim()) {
+    if (!configuredFromEmail || campaign.fromEmail.trim().toLowerCase() !== configuredFromEmail.toLowerCase()) {
+      throw new Error('From address does not match the verified Sender Identity (SENDGRID_FROM_EMAIL)');
+    }
+  }
+
+  if (campaign.mode === 'live' && !configuredFromEmail) {
+    throw new Error('SENDGRID_FROM_EMAIL is not configured on the server');
+  }
+
+  const fromEmail = configuredFromEmail;
   const fromName = campaign.fromName || process.env.SENDGRID_FROM_NAME || 'MailFlow';
 
   campaign.status = 'sending';
