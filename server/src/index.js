@@ -15,16 +15,6 @@ validateEnv();
 const PORT = parseInt(process.env.PORT, 10) || 5000;
 const app = createApp();
 
-// Ensure DB connection for serverless / incoming requests
-app.use(async (req, res, next) => {
-  try {
-    await connectDB();
-    next();
-  } catch (err) {
-    next(err);
-  }
-});
-
 async function start() {
   try {
     await connectDB();

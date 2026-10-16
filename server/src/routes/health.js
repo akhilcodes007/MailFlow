@@ -6,13 +6,21 @@
 'use strict';
 
 const express = require('express');
-const { getConnectionStatus } = require('../config/database');
+const { connectDB, getConnectionStatus } = require('../config/database');
 const { authenticate } = require('../middleware/auth');
 const { isSendGridConfigured } = require('../services/emailService');
 
 const router = express.Router();
 
 router.get('/', async (req, res) => {
+  if (process.env.NODE_ENV !== 'test') {
+    try {
+      await connectDB();
+    } catch {
+      // Handled below; response JSON reflects actual connection state without crashing
+    }
+  }
+
   const db = getConnectionStatus();
   const isHealthy = db.readyState === 1;
 

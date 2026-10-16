@@ -15,9 +15,16 @@ const authRouter = require('./routes/auth');
 const campaignsRouter = require('./routes/campaigns');
 const webhooksRouter = require('./routes/webhooks');
 const errorHandler = require('./middleware/errorHandler');
+const { connectDB } = require('./config/database');
 
-function createApp() {
+function createApp(options = {}) {
   const app = express();
+
+  // ── Proxy configuration ──────────────────────────────────────────────────
+  // Vercel routes requests through a reverse proxy. Trust the 1st hop (Vercel)
+  // so express-rate-limit and req.ip accurately identify client IPs without
+  // allowing arbitrary spoofed X-Forwarded-For chains.
+  app.set('trust proxy', 1);
 
   // ── Security headers ─────────────────────────────────────────────────────
   app.use(helmet());
@@ -79,6 +86,27 @@ function createApp() {
     message: { success: false, message: 'Too many login attempts, please try again later.' },
   });
   app.use('/api/auth', authLimiter);
+
+  // ── Scoped database connection middleware ────────────────────────────────
+  // Ensures MongoDB is connected before any database-dependent route executes.
+  // Unrelated routes and nonexistent paths (404s) do not trigger DB connections.
+  // Root health probe (GET /api/health) checks DB status independently.
+  const shouldConnectDb = options.connectDb ?? (process.env.NODE_ENV !== 'test');
+  const dbMiddleware = shouldConnectDb
+    ? async (req, res, next) => {
+        try {
+          await connectDB();
+          next();
+        } catch (err) {
+          next(err);
+        }
+      }
+    : (req, res, next) => next();
+
+  app.use('/api/health/config', dbMiddleware);
+  app.use('/api/auth', dbMiddleware);
+  app.use('/api/campaigns', dbMiddleware);
+  app.use('/api/webhooks', dbMiddleware);
 
   // ── Routes ───────────────────────────────────────────────────────────────
   app.use('/api/health', healthRouter);

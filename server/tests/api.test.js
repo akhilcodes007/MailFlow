@@ -9,6 +9,8 @@ const jwt = require('jsonwebtoken');
 const { createApp } = require('../src/app');
 const User = require('../src/models/User');
 const { validateEnv } = require('../src/config/env');
+const { sanitizeUri } = require('../src/config/database');
+const mongoose = require('mongoose');
 
 const app = createApp();
 
@@ -171,6 +173,114 @@ describe('API Integration Tests', () => {
 
       process.env.NODE_ENV = oldEnv;
       process.env.SENDGRID_WEBHOOK_VERIFICATION_KEY = oldKey;
+    });
+  });
+
+  describe('Proxy and Rate Limit Configuration', () => {
+    test('trusts exactly 1 proxy hop for Vercel deployment', () => {
+      expect(app.get('trust proxy')).toBe(1);
+    });
+
+    test('handles X-Forwarded-For header without ERR_ERL_UNEXPECTED_X_FORWARDED_FOR', async () => {
+      const res = await request(app)
+        .get('/api/health')
+        .set('X-Forwarded-For', '203.0.113.195');
+
+      expect([200, 503]).toContain(res.status);
+      expect(res.body.service).toBe('mailflow-api');
+    });
+
+    test('ignores spoofed client IP in multi-hop X-Forwarded-For chain', async () => {
+      // With trust proxy = 1, Express treats the rightmost IP before the proxy as client IP
+      const express = require('express');
+      const testApp = express();
+      testApp.set('trust proxy', 1);
+
+      let capturedIp;
+      testApp.get('/test-ip', (req, res) => {
+        capturedIp = req.ip;
+        res.json({ ip: req.ip });
+      });
+
+      await request(testApp)
+        .get('/test-ip')
+        .set('X-Forwarded-For', '198.51.100.1, 203.0.113.195');
+
+      expect(capturedIp).toBe('203.0.113.195');
+    });
+  });
+
+  describe('Database Connection and Sanitization', () => {
+    test('sanitizeUri removes credentials and query string from MongoDB URI', () => {
+      const standardUri = 'mongodb+srv://admin_user:SuperSecret123@cluster0.abcde.mongodb.net/mailflow?retryWrites=true&w=majority';
+      const sanitized = sanitizeUri(standardUri);
+      expect(sanitized).not.toContain('admin_user');
+      expect(sanitized).not.toContain('SuperSecret123');
+      expect(sanitized).not.toContain('retryWrites');
+      expect(sanitized).toBe('mongodb+srv://cluster0.abcde.mongodb.net/mailflow');
+
+      const replicaUri = 'mongodb://user:pass@host1:27017,host2:27017/mailflow?replicaSet=rs0';
+      const sanitizedReplica = sanitizeUri(replicaUri);
+      expect(sanitizedReplica).not.toContain('user');
+      expect(sanitizedReplica).not.toContain('pass');
+      expect(sanitizedReplica).toBe('mongodb://***:***@host1:27017,host2:27017/mailflow');
+    });
+
+    test('propagates error when connectDB fails in serverless request middleware', async () => {
+      const dbApp = createApp({ connectDb: true });
+      jest.spyOn(mongoose, 'connect').mockRejectedValueOnce(new Error('Connection timeout in Atlas'));
+
+      const res = await request(dbApp).post('/api/auth/login').send({
+        email: 'admin@example.com',
+        password: 'password123',
+      });
+
+      expect(res.status).toBe(500);
+      expect(res.body.success).toBe(false);
+      mongoose.connect.mockRestore();
+    });
+
+    test('allows GET /api/health to report status without being blocked by connection middleware', async () => {
+      const dbApp = createApp({ connectDb: true });
+      jest.spyOn(mongoose, 'connect').mockRejectedValueOnce(new Error('Atlas unreachable'));
+
+      const res = await request(dbApp).get('/api/health');
+
+      expect([200, 503]).toContain(res.status);
+      expect(res.body.service).toBe('mailflow-api');
+      expect(res.body.database).toBeDefined();
+      expect(res.body.database.connected).toBe(false);
+      mongoose.connect.mockRestore();
+    });
+
+    test('blocks GET /api/health/config from reaching authenticated handler when connection fails', async () => {
+      const dbApp = createApp({ connectDb: true });
+      jest.spyOn(mongoose, 'connect').mockRejectedValueOnce(new Error('Atlas unreachable'));
+      const findByIdSpy = jest.spyOn(User, 'findById');
+
+      const res = await request(dbApp)
+        .get('/api/health/config')
+        .set('Authorization', `Bearer ${authToken}`);
+
+      expect(res.status).toBe(500);
+      expect(res.body.success).toBe(false);
+      // Confirms authenticate middleware / handler was never reached
+      expect(findByIdSpy).not.toHaveBeenCalled();
+
+      findByIdSpy.mockRestore();
+      mongoose.connect.mockRestore();
+    });
+
+    test('returns 404 for nonexistent routes without triggering database connection', async () => {
+      const dbApp = createApp({ connectDb: true });
+      const connectSpy = jest.spyOn(mongoose, 'connect');
+
+      const res = await request(dbApp).get('/api/nonexistent-route');
+
+      expect(res.status).toBe(404);
+      expect(res.body.success).toBe(false);
+      expect(connectSpy).not.toHaveBeenCalled();
+      connectSpy.mockRestore();
     });
   });
 });
