@@ -7,8 +7,6 @@
     "dev": "nodemon src/index.js",
     "start": "node src/index.js",
     "seed": "node src/scripts/seed.js",
-    "backup": "node src/scripts/backup.js",
-    "migrate": "node src/scripts/migrateMultiUser.js",
     "test": "jest --runInBand"
   },
   "engines": {

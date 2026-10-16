@@ -9,7 +9,7 @@ const express = require('express');
 const { body, param, query } = require('express-validator');
 const Campaign = require('../models/Campaign');
 const Suppression = require('../models/Suppression');
-const { authenticate, requireRole } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth');
 const { validate } = require('../middleware/validate');
 const {
   processCampaignSending,
@@ -141,7 +141,7 @@ router.post(
 
       const result = await sendSingleRecipientEmail({
         to: adminEmail,
-        name: req.user.name || 'User',
+        name: 'Admin',
         fromEmail: configuredFromEmail,
         fromName,
         subjectTemplate: `[TEST] ${subject}`,
@@ -348,50 +348,7 @@ router.post(
   }
 );
 
-// ── 6. Suppression management routes (declared before /:id to prevent route shadowing) ──
-router.get('/suppressions', async (req, res, next) => {
-  try {
-    const suppressions = await Suppression.find().sort({ createdAt: -1 }).limit(100).lean();
-    res.json({ success: true, suppressions });
-  } catch (err) {
-    next(err);
-  }
-});
-
-router.post(
-  '/suppressions',
-  [
-    body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
-    body('reason').optional().isIn(['unsubscribe', 'bounce', 'complaint', 'manual']),
-    validate,
-  ],
-  async (req, res, next) => {
-    try {
-      const email = req.body.email.toLowerCase().trim();
-      const suppression = await Suppression.findOneAndUpdate(
-        { email },
-        { email, reason: req.body.reason || 'manual' },
-        { upsert: true, new: true }
-      );
-      res.json({ success: true, suppression });
-    } catch (err) {
-      next(err);
-    }
-  }
-);
-
-// Only admins may delete global suppressions to protect deliverability and safety
-router.delete('/suppressions/:email', requireRole('admin'), async (req, res, next) => {
-  try {
-    const email = req.params.email.toLowerCase().trim();
-    await Suppression.findOneAndDelete({ email });
-    res.json({ success: true, message: 'Email removed from suppression list' });
-  } catch (err) {
-    next(err);
-  }
-});
-
-// ── 7. Get single campaign details ─────────────────────────────────────────────
+// ── 6. Get single campaign details ─────────────────────────────────────────────
 router.get(
   '/:id',
   [param('id').isMongoId().withMessage('Invalid campaign ID'), validate],
@@ -580,5 +537,46 @@ router.delete(
   }
 );
 
-module.exports = router;
+// ── 11. Suppression management routes ──────────────────────────────────────────
+router.get('/suppressions', async (req, res, next) => {
+  try {
+    const suppressions = await Suppression.find().sort({ createdAt: -1 }).limit(100).lean();
+    res.json({ success: true, suppressions });
+  } catch (err) {
+    next(err);
+  }
+});
 
+router.post(
+  '/suppressions',
+  [
+    body('email').isEmail().normalizeEmail().withMessage('Valid email required'),
+    body('reason').optional().isIn(['unsubscribe', 'bounce', 'complaint', 'manual']),
+    validate,
+  ],
+  async (req, res, next) => {
+    try {
+      const email = req.body.email.toLowerCase().trim();
+      const suppression = await Suppression.findOneAndUpdate(
+        { email },
+        { email, reason: req.body.reason || 'manual' },
+        { upsert: true, new: true }
+      );
+      res.json({ success: true, suppression });
+    } catch (err) {
+      next(err);
+    }
+  }
+);
+
+router.delete('/suppressions/:email', async (req, res, next) => {
+  try {
+    const email = req.params.email.toLowerCase().trim();
+    await Suppression.findOneAndDelete({ email });
+    res.json({ success: true, message: 'Email removed from suppression list' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+module.exports = router;

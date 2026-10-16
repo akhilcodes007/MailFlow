@@ -70,26 +70,13 @@ export default function Layout({ children }) {
 
         {/* User + Logout */}
         <div className="p-3 border-t border-slate-700/80">
-          <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-slate-900/60 border border-slate-700/50 mb-2">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-xs font-bold text-white flex-shrink-0 shadow-sm">
-              {(user?.name?.[0] || user?.email?.[0] || 'U').toUpperCase()}
+          <div className="flex items-center gap-3 px-3 py-2 rounded-xl bg-slate-900/60 border border-slate-700/50 mb-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
+              {user?.email?.[0]?.toUpperCase() ?? 'A'}
             </div>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-1.5">
-                <p className="text-xs font-semibold text-slate-100 truncate">
-                  {user?.name || (user?.role === 'admin' ? 'Administrator' : 'User')}
-                </p>
-                <span
-                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
-                    user?.role === 'admin'
-                      ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
-                      : 'bg-slate-700 text-slate-300 border border-slate-600'
-                  }`}
-                >
-                  {user?.role === 'admin' ? 'Admin' : 'User'}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 truncate mt-0.5">{user?.email ?? 'user@example.com'}</p>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-slate-100 truncate">{user?.email ?? 'admin@example.com'}</p>
+              <p className="text-[10px] text-slate-400 capitalize">{user?.role ?? 'admin'}</p>
             </div>
           </div>
           <button

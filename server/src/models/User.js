@@ -12,13 +12,6 @@ const SALT_ROUNDS = 12;
 
 const userSchema = new mongoose.Schema(
   {
-    name: {
-      type: String,
-      required: [true, 'Name is required'],
-      trim: true,
-      maxlength: [60, 'Name cannot exceed 60 characters'],
-      default: 'User',
-    },
     email: {
       type: String,
       required: [true, 'Email is required'],
@@ -35,30 +28,8 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['admin', 'user'],
-      default: 'user',
-    },
-    isEmailVerified: {
-      type: Boolean,
-      default: false,
-    },
-    tokenVersion: {
-      type: Number,
-      default: 0,
-    },
-    verificationTokenHash: {
-      type: String,
-      select: false,
-    },
-    verificationTokenExpires: {
-      type: Date,
-    },
-    resetPasswordTokenHash: {
-      type: String,
-      select: false,
-    },
-    resetPasswordTokenExpires: {
-      type: Date,
+      enum: ['admin'],
+      default: 'admin',
     },
     lastLogin: { type: Date },
     loginAttempts: { type: Number, default: 0 },

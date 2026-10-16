@@ -70,45 +70,15 @@ function createApp() {
   });
   app.use(globalLimiter);
 
-  // ── Auth rate limiters ──────────────────────────────────────────────────
-  const isProd = process.env.NODE_ENV === 'production';
-
-  const loginLimiter = rateLimit({
+  // ── Stricter limiter for auth endpoints ──────────────────────────────────
+  const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: isProd ? 10 : 100,
+    max: process.env.NODE_ENV === 'production' ? 10 : 100,
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, message: 'Too many login attempts, please try again later.' },
   });
-
-  const registerLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000,
-    max: isProd ? 5 : 100,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, message: 'Too many registration attempts from this IP, please try again later.' },
-  });
-
-  const forgotPasswordLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: isProd ? 5 : 100,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, message: 'Too many password reset requests, please try again later.' },
-  });
-
-  const resendLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: isProd ? 3 : 100,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, message: 'Too many verification resend attempts, please try again later.' },
-  });
-
-  app.use('/api/auth/login', loginLimiter);
-  app.use('/api/auth/register', registerLimiter);
-  app.use('/api/auth/forgot-password', forgotPasswordLimiter);
-  app.use('/api/auth/resend-verification', resendLimiter);
+  app.use('/api/auth', authLimiter);
 
   // ── Routes ───────────────────────────────────────────────────────────────
   app.use('/api/health', healthRouter);
