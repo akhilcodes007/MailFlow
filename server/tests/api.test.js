@@ -69,6 +69,10 @@ describe('API Integration Tests', () => {
   });
 
   describe('Authentication Enforcement', () => {
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
     test('rejects unauthenticated requests to /api/campaigns with 401', async () => {
       const res = await request(app).get('/api/campaigns');
 
@@ -99,6 +103,38 @@ describe('API Integration Tests', () => {
       expect(res.status).toBe(422);
       expect(res.body.success).toBe(false);
       expect(res.body.errors).toBeDefined();
+    });
+
+    test('authenticates credentials without exposing passwords or secrets in response', async () => {
+      const mockAdminUser = {
+        _id: '507f1f77bcf86cd799439011',
+        email: 'admin@example.com',
+        role: 'admin',
+        isLocked: false,
+        comparePassword: jest.fn().mockResolvedValue(true),
+        resetLoginAttempts: jest.fn().mockResolvedValue(true),
+      };
+
+      jest.spyOn(User, 'findOne').mockReturnValue({
+        select: jest.fn().mockResolvedValue(mockAdminUser),
+      });
+
+      const res = await request(app)
+        .post('/api/auth/login')
+        .send({ email: 'admin@example.com', password: 'AdminPass123!' });
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.token).toBeDefined();
+      expect(res.body.user).toEqual({
+        id: '507f1f77bcf86cd799439011',
+        email: 'admin@example.com',
+        role: 'admin',
+      });
+      expect(res.body.user.password).toBeUndefined();
+      expect(JSON.stringify(res.body)).not.toContain('AdminPass123!');
+
+      User.findOne.mockRestore();
     });
   });
 

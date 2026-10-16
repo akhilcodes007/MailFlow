@@ -1,12 +1,15 @@
 /**
  * src/pages/LoginPage.jsx
- * Admin login form with error handling and loading state.
+ * Admin login form with error handling, loading state, and optional demo login.
  */
 import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
-import { Mail, Lock, Zap, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, Zap, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { getDemoConfig } from '../lib/demoConfig';
+
+const { isDemoEnabled, demoEmail, demoPassword } = getDemoConfig();
 
 export default function LoginPage() {
   const { user, login } = useAuth();
@@ -18,12 +21,11 @@ export default function LoginPage() {
 
   if (user) return <Navigate to="/dashboard" replace />;
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const executeLogin = async (email, password) => {
     setError('');
     setLoading(true);
     try {
-      await login(form.email, form.password);
+      await login(email, password);
       toast.success('Welcome back!');
       navigate('/dashboard');
     } catch (err) {
@@ -32,6 +34,17 @@ export default function LoginPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    await executeLogin(form.email, form.password);
+  };
+
+  const handleQuickLogin = async () => {
+    if (!isDemoEnabled || !demoEmail || !demoPassword) return;
+    setForm({ email: demoEmail, password: demoPassword });
+    await executeLogin(demoEmail, demoPassword);
   };
 
   return (
@@ -116,6 +129,22 @@ export default function LoginPage() {
               {loading ? 'Signing in…' : 'Sign in'}
             </button>
           </form>
+
+          {/* Quick Login — Demo Account (only rendered when demo mode and credentials are fully configured) */}
+          {isDemoEnabled && (
+            <div className="mt-5 pt-5 border-t border-slate-700/60">
+              <button
+                type="button"
+                onClick={handleQuickLogin}
+                disabled={loading}
+                aria-label="Quick Login with Demo Account"
+                className="w-full py-2.5 px-4 rounded-xl bg-slate-700/40 hover:bg-slate-700/70 border border-slate-600/60 hover:border-slate-500 text-slate-200 hover:text-white font-medium text-sm transition-all duration-200 flex items-center justify-center gap-2 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer focus:outline-none focus:ring-2 focus:ring-amber-500/40"
+              >
+                <Sparkles className="w-4 h-4 text-amber-400" aria-hidden="true" />
+                <span>Quick Login — Demo Account</span>
+              </button>
+            </div>
+          )}
 
           <p className="text-center text-xs text-slate-500 mt-6">
             Admin accounts are managed by the system administrator.
